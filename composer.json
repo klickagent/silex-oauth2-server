@@ -1,17 +1,18 @@
 {
-    "name": "jasongrimes/silex-oauth2-server",
-    "description": "A Silex service provider for implementing an OAuth 2 server, using the league/oauth2-server library.",
+    "name": "klickagent/silex-oauth2-server",
+    "description": "A Silex service provider for implementing an OAuth 2 server, using the league/oauth2-server library. (Edited original from jasongrimes)",
     "license": "MIT",
     "repositories": [
         {
             "type": "git",
-            "url": "https://github.com/jasongrimes/silex-oauth2-server"
+            "url": "https://github.com/klickagent/silex-oauth2-server"
         }
     ],
     "require": {
+        "silex/silex": "~2.0",
         "php": ">=5.3.0",
         "league/oauth2-server": "dev-develop",
-        "doctrine/dbal": "2.2.*"
+        "doctrine/dbal": "~2.5.4"
     },
     "require-dev": {
         "phpunit/phpunit": "*",
@@ -22,6 +23,12 @@
             "name": "Jason Grimes",
             "email": "jason@grimesit.com",
             "homepage": "http://www.jasongrimes.org",
+            "role": "Developer"
+        },
+        {
+            "name": "Roman Lickel",
+            "email": "hello@klickagent.ch",
+            "homepage": "http://www.klickagent.ch",
             "role": "Developer"
         }
     ],

@@ -1,87 +1,93 @@
---
--- MySQL-flavored DDL for setting up database schema.
---
---
+# ************************************************************
+# Sequel Pro SQL dump
+# Version 4499
+#
+# http://www.sequelpro.com/
+# https://github.com/sequelpro/sequelpro
+#
+# Host: 127.0.0.1 (MySQL 5.6.31-0ubuntu0.14.04.2)
+# Database: locopoly
+# Generation Time: 2016-08-13 19:55:27 +0000
+# ************************************************************
 
-DROP TABLE IF EXISTS oauth_clients;
-DROP TABLE IF EXISTS oauth_client_endpoints;
-DROP TABLE IF EXISTS oauth_sessions;
-DROP TABLE IF EXISTS oauth_session_access_tokens;
-DROP TABLE IF EXISTS oauth_session_authcodes;
-DROP TABLE IF EXISTS oauth_session_redirects;
-DROP TABLE IF EXISTS oauth_session_refresh_tokens;
-DROP TABLE IF EXISTS oauth_scopes;
-DROP TABLE IF EXISTS oauth_session_token_scopes;
-DROP TABLE IF EXISTS oauth_session_authcode_scopes;
 
-CREATE TABLE `oauth_clients` (
-  `id` CHAR(40) NOT NULL,
-  `secret` CHAR(40) NOT NULL,
-  `name` VARCHAR(255) NOT NULL,
-  `auto_approve` TINYINT(1) NOT NULL DEFAULT '0',
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+
+# Dump of table oauth_access_token
+# ------------------------------------------------------------
+
+DROP TABLE IF EXISTS `oauth_access_token`;
+
+CREATE TABLE `oauth_access_token` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `access_token` varchar(1000) NOT NULL DEFAULT '',
+  `access_token_expires` int(10) unsigned NOT NULL,
+  `client_id` char(40) NOT NULL DEFAULT '',
+  `user_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+
+# Dump of table oauth_authcode
+# ------------------------------------------------------------
+
+DROP TABLE IF EXISTS `oauth_authcode`;
+
+CREATE TABLE `oauth_authcode` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `auth_code` varchar(1000) NOT NULL DEFAULT '',
+  `auth_code_expires` int(10) unsigned NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+
+# Dump of table oauth_client
+# ------------------------------------------------------------
+
+DROP TABLE IF EXISTS `oauth_client`;
+
+CREATE TABLE `oauth_client` (
+  `id` char(40) NOT NULL,
+  `secret` char(40) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `auto_approve` tinyint(1) NOT NULL DEFAULT '0',
+  `redirect_uri` varchar(255) DEFAULT '',
   PRIMARY KEY (`id`),
   UNIQUE KEY `u_oacl_clse_clid` (`secret`,`id`)
-) ENGINE=INNODB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-CREATE TABLE `oauth_client_endpoints` (
+
+
+# Dump of table oauth_refresh_token
+# ------------------------------------------------------------
+
+DROP TABLE IF EXISTS `oauth_refresh_token`;
+
+CREATE TABLE `oauth_refresh_token` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `client_id` char(40) NOT NULL,
-  `redirect_uri` varchar(255) NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `i_oaclen_clid` (`client_id`),
-  CONSTRAINT `f_oaclen_clid` FOREIGN KEY (`client_id`) REFERENCES `oauth_clients` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-CREATE TABLE `oauth_sessions` (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `client_id` char(40) NOT NULL,
-  `owner_type` enum('user','client') NOT NULL DEFAULT 'user',
-  `owner_id` varchar(255) NOT NULL,
-PRIMARY KEY (`id`),
-KEY `i_uase_clid_owty_owid` (`client_id`,`owner_type`,`owner_id`),
-CONSTRAINT `f_oase_clid` FOREIGN KEY (`client_id`) REFERENCES `oauth_clients` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-CREATE TABLE `oauth_session_access_tokens` (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `session_id` int(10) unsigned NOT NULL,
-  `access_token` char(40) NOT NULL,
-  `access_token_expires` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `u_oaseacto_acto_seid` (`access_token`,`session_id`),
-  KEY `f_oaseto_seid` (`session_id`),
-  CONSTRAINT `f_oaseto_seid` FOREIGN KEY (`session_id`) REFERENCES `oauth_sessions` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-CREATE TABLE `oauth_session_authcodes` (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `session_id` int(10) unsigned NOT NULL,
-  `auth_code` char(40) NOT NULL,
-  `auth_code_expires` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `session_id` (`session_id`),
-  CONSTRAINT `oauth_session_authcodes_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `oauth_sessions` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-CREATE TABLE `oauth_session_redirects` (
-  `session_id` int(10) unsigned NOT NULL,
-  `redirect_uri` varchar(255) NOT NULL,
-  PRIMARY KEY (`session_id`),
-  CONSTRAINT `f_oasere_seid` FOREIGN KEY (`session_id`) REFERENCES `oauth_sessions` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
-CREATE TABLE `oauth_session_refresh_tokens` (
-  `session_access_token_id` int(10) unsigned NOT NULL,
-  `refresh_token` char(40) NOT NULL,
+  `refresh_token` varchar(1000) NOT NULL DEFAULT '',
   `refresh_token_expires` int(10) unsigned NOT NULL,
-  `client_id` char(40) NOT NULL,
-  PRIMARY KEY (`session_access_token_id`),
-  KEY `client_id` (`client_id`),
-  CONSTRAINT `oauth_session_refresh_tokens_ibfk_1` FOREIGN KEY (`client_id`) REFERENCES `oauth_clients` (`id`) ON DELETE CASCADE,
-CONSTRAINT `f_oasetore_setoid` FOREIGN KEY (`session_access_token_id`) REFERENCES `oauth_session_access_tokens` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+  `access_token_id` char(40) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-CREATE TABLE `oauth_scopes` (
+
+
+# Dump of table oauth_scope
+# ------------------------------------------------------------
+
+DROP TABLE IF EXISTS `oauth_scope`;
+
+CREATE TABLE `oauth_scope` (
   `id` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
   `scope` varchar(255) NOT NULL,
   `name` varchar(255) NOT NULL,
@@ -90,22 +96,12 @@ CREATE TABLE `oauth_scopes` (
   UNIQUE KEY `u_oasc_sc` (`scope`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-CREATE TABLE `oauth_session_token_scopes` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `session_access_token_id` int(10) unsigned DEFAULT NULL,
-  `scope_id` smallint(5) unsigned NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `u_setosc_setoid_scid` (`session_access_token_id`,`scope_id`),
-  KEY `f_oasetosc_scid` (`scope_id`),
-  CONSTRAINT `f_oasetosc_scid` FOREIGN KEY (`scope_id`) REFERENCES `oauth_scopes` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION,
-  CONSTRAINT `f_oasetosc_setoid` FOREIGN KEY (`session_access_token_id`) REFERENCES `oauth_session_access_tokens` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-CREATE TABLE `oauth_session_authcode_scopes` (
-  `oauth_session_authcode_id` int(10) unsigned NOT NULL,
-  `scope_id` smallint(5) unsigned NOT NULL,
-  KEY `oauth_session_authcode_id` (`oauth_session_authcode_id`),
-  KEY `scope_id` (`scope_id`),
-CONSTRAINT `oauth_session_authcode_scopes_ibfk_2` FOREIGN KEY (`scope_id`) REFERENCES `oauth_scopes` (`id`) ON DELETE CASCADE,
-CONSTRAINT `oauth_session_authcode_scopes_ibfk_1` FOREIGN KEY (`oauth_session_authcode_id`) REFERENCES `oauth_session_authcodes` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;

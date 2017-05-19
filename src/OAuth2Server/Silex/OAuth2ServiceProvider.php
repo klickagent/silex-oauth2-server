@@ -2,17 +2,22 @@
 
 namespace OAuth2Server\Silex;
 
-use OAuth2Server\ScopeManager;
-use OAuth2Server\SessionManager;
-use OAuth2Server\ClientManager;
-use OAuth2\AuthServer;
-use OAuth2\ResourceServer;
-use OAuth2\Grant\Password as PasswordGrantType;
-use OAuth2\Grant\AuthCode as AuthCodeGrantType;
-use OAuth2\Grant\ClientCredentials as ClientCredentialsGrantType;
-use OAuth2\Grant\RefreshToken as RefreshTokenGrantType;
+use League\OAuth2\Server\AuthorizationServer;
+use League\OAuth2\Server\Exception\OAuthServerException;
+use League\OAuth2\Server\Grant\PasswordGrant;
+use OAuth2Server\Repositories\AccessTokenRepository;
+use OAuth2Server\Repositories\ClientRepository;
+use OAuth2Server\Repositories\RefreshTokenRepository;
+use OAuth2Server\Repositories\ScopeRepository;
+use OAuth2Server\Repositories\UserRepository;
+use League\OAuth2\Server\Grant\AuthCodeGrant;
+use OAuth2Server\Repositories\AuthCodeRepository;
+use OAuth2Server\Silex\OAuth2Provider;
+
+
 use Silex\Application;
-use Silex\ServiceProviderInterface;
+use Pimple\Container;
+use Pimple\ServiceProviderInterface;
 use \RuntimeException;
 
 class OAuth2ServiceProvider implements ServiceProviderInterface
@@ -26,61 +31,135 @@ class OAuth2ServiceProvider implements ServiceProviderInterface
      * @param Application $app An Application instance
      * @throws RuntimeException if options are invalid.
      */
-    public function register(Application $app)
+    public function register(Container $app)
     {
-        $app['oauth2.session_manager'] = $app->share(function() use ($app) {
-            return new SessionManager($app['db']);
-        });
+        /*$app['oauth2server.session_manager'] = function() use ($app) {
+            return new SessionStore($app['db']);
+        };
+		*/
+        $app['oauth2server.client_repository'] = function() use ($app) {
+            return new ClientRepository($app); // instance of ClientRepositoryInterface
+        };
 
-        $app['oauth2.client_manager'] = $app->share(function() use ($app) {
-            return new ClientManager($app['db']);
-        });
+        $app['oauth2server.access_token_repository'] = function() use ($app) {
+            return new AccessTokenRepository($app); // instance of AccessTokenRepositoryInterface
+        };
 
-        $app['oauth2.scope_manager'] = $app->share(function() use ($app) {
-            return new ScopeManager($app['db']);
-        });
+        $app['oauth2server.scope_repository'] = function() use ($app) {
+            return new ScopeRepository($app); // instance of ScopeRepositoryInterface
+        };
+        
+        $app['oauth2server.auth_code_repository'] = function() use ($app) {
+            return new AuthCodeRepository($app); // instance of ScopeRepositoryInterface
+        };
+        
+        $app['oauth2server.refresh_token_repository'] = function() use ($app) {
+            return new RefreshTokenRepository($app); // instance of ScopeRepositoryInterface
+        };
 
-        $app['oauth2.resource_server'] = $app->share(function() use ($app) {
-            return new ResourceServer($app['oauth2.session_manager']);
-        });
+		$app['oauth2server.user_repository'] = function() use ($app) {
+		  
+		   return new UserRepository($app); // instance of ScopeRepositoryInterface
+		  
+		};
+		
 
-        $app['oauth2.auth_server'] = $app->share(function() use ($app) {
-            $authServer = new AuthServer($app['oauth2.client_manager'], $app['oauth2.session_manager'], $app['oauth2.scope_manager']);
-
-            $options = isset($app['oauth2.options']) ? $app['oauth2.options'] : array();
+    $app['oauth2server.auth_server'] = function() use ($app) {
+        
+    	$privateKey = ($app['oauth2server.key_private']) ? : '/var/www/html/private.key';    // path to private key
+    	$publicKey = ($app['oauth2server.key_public']) ? : '/var/www/html/public.key';      // path to public key
+        	
+			$AuthorizationServer = new AuthorizationServer(
+			    $app['oauth2server.client_repository'],
+			    $app['oauth2server.access_token_repository'],
+			    $app['oauth2server.scope_repository'],
+			    $privateKey,
+			    $publicKey
+			);
+            $options = isset($app['oauth2server.options']) ? $app['oauth2server.options'] : array();
 
             if (array_key_exists('access_token_ttl', $options)) {
-                $authServer->setExpiresIn($options['access_token_ttl']);
+                $AuthorizationServer->setExpiresIn($options['access_token_ttl']);
             }
 
             // Configure grant types.
             if (array_key_exists('grant_types', $options) && is_array($options['grant_types'])) {
-                foreach ($app['oauth2.options']['grant_types'] as $type) {
+                foreach ($app['oauth2server.options']['grant_types'] as $type) {
                     switch ($type) {
                         case 'authorization_code':
-                            $authServer->addGrantType(new AuthCodeGrantType());
+                            $AuthorizationServer->enableGrantType(
+                                new AuthCodeGrant(
+                                    $app['oauth2server.auth_code_repository'],
+                                    $app['oauth2server.refresh_token_repository'],
+                                    new \DateInterval('PT10M')
+                                ),
+                                new \DateInterval('PT1H')
+                            );
                             break;
                         case 'client_credentials':
-                            $authServer->addGrantType(new ClientCredentialsGrantType());
+                            $AuthorizationServer->enableGrantType(
+                            	new \League\OAuth2\Server\Grant\ClientCredentialsGrant(),
+                            	new \DateInterval('PT1H') // access tokens will expire after 1 hour
+                            );
                             break;
                         case 'password':
-                            if (!is_callable($options['password_verify_callback'])) {
-                                throw new RuntimeException('To use the OAuth2 "password" grant type, the "password_verify_callback" option must be set to a callback function.');
-                            }
-                            $grantType = new PasswordGrantType();
-                            $grantType->setVerifyCredentialsCallback($options['password_verify_callback']);
-                            $authServer->addGrantType($grantType);
+                            $grant = new PasswordGrant(
+                                $app['oauth2server.user_repository'],           // instance of UserRepositoryInterface
+                                $app['oauth2server.refresh_token_repository']    // instance of RefreshTokenRepositoryInterface
+                            );
+                            $grant->setRefreshTokenTTL(new \DateInterval('P1M')); // refresh tokens will expire after 1 month
+                    
+                            // Enable the password grant on the server with a token TTL of 1 hour
+                            $AuthorizationServer->enableGrantType(
+                                $grant,
+                                new \DateInterval('PT1H') // access tokens will expire after 1 hour
+                            );
                             break;
                         case 'refresh_token':
-                            $authServer->addGrantType(new RefreshTokenGrantType());
+                        
+                            $grant = new \League\OAuth2\Server\Grant\RefreshTokenGrant($app['oauth2server.refresh_token_repository']);
+                            $grant->setRefreshTokenTTL(new \DateInterval('P1M')); // new refresh tokens will expire after 1 month
+                            
+                            // Enable the refresh token grant on the server
+                            $AuthorizationServer->enableGrantType(
+                                $grant,
+                                new \DateInterval('PT1H') // new access tokens will expire after an hour
+                            );
+                            
+                            //$AuthorizationServer->addGrantType(new RefreshTokenGrantType());
                             break;
                         default:
-                            throw new RuntimeException('Invalid grant type "' . $type . '" specified in oauth2.options.');
+                            throw new RuntimeException('Invalid grant type "' . $type . '" specified in oauth2server.options.');
                     }
                 }
             }
+            return $AuthorizationServer;
+        };
+        
+        
+        $app['security.authentication_listener.factory.oauth2server'] = $app->protect(function ($name, $options) use ($app) {
+            // define the authentication provider object
+            $app['security.authentication_provider.' . $name . '.oauth2server'] = function () use ($app) {
+                $securityDir = $app['oauth2server.security_dir'] ? $app['oauth2server.security_dir'] : __DIR__ . self::$DEFAULT_SECURITY_DIR;
+                $timeWindow = $app['oauth2server.valid_time_window'] ? $app['oauth2server.valid_time_window'] : self::$DEFAULT_VALID_TIME_WINDOW;
+                return new OAuth2Provider($app['oauth2server.user'], $securityDir, $timeWindow);
+            };
 
-            return $authServer;
+            // define the authentication listener object
+            $app['security.authentication_listener.' . $name . '.oauth2server'] = function () use ($app) {
+                return new OAuth2Listener($app['security.token_storage'], $app['security.authentication_manager']);
+            };
+
+            return array(
+                // the authentication provider id
+                'security.authentication_provider.' . $name . '.oauth2server',
+                // the authentication listener id
+                'security.authentication_listener.' . $name . '.oauth2server',
+                // the entry point id
+                null,
+                // the position of the listener in the stack
+                'pre_auth'
+            );
         });
 
     }
